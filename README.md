@@ -4,7 +4,7 @@
 
 This project is a computer vision application designed for real-time object detection, tracking, and prediction in [Robot Master Competition](https://www.robomaster.com/en-US). The main features of this project are:
 
-- Utilizing opencv for image processing, it identifies and follows armor board of enemy robots using camera.
+- Utilizing opencv for image processing, it identifies and follows armor board of enemy robots using camera. 
 - Establishing data transmission with lower level platform STM32 via UART, it commands the gimbal of robot to auto aim target.
 
 ## **Requirement**

@@ -18,7 +18,7 @@ import struct
 active_cam_config = None
 frame_aligner = None
 
-
+# DO NOT REMOVE (?) -- Someone please check if this is actually needed.
 def nothing(x):
     pass
 
