@@ -693,8 +693,8 @@ def main(camera: CameraSource, target_color: TargetColor, show_stream: str):
                    
             bbox = clipRect(bbox, (color_image.shape[1], color_image.shape[0]))
             
-            # Create KCF tracker
-            tracker = cv2.TrackerKCF_create()
+            # Create CSRT tracker
+            tracker = cv2.TrackerCSRT_create()
             # Initialize tracker
             tracker.init(color_image, bbox)
             tracking_frames = 0
