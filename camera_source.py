@@ -28,12 +28,12 @@ class CameraSource:
         if recording_source is None:
             self.active_cam_config = default_config
 
+            # First try to use Intel RealSense camera
             try:
                 import pyrealsense2 as rs
                 # Configure depth and color streams
                 pipeline = rs.pipeline()
                 config = rs.config()
-
 
                 # Get device product line for setting a supporting resolution
                 pipeline_wrapper = rs.pipeline_wrapper(pipeline)
@@ -72,6 +72,9 @@ class CameraSource:
 
                 self._rs_pipeline = pipeline
                 self._rs_frame_aligner = frame_aligner
+                
+                logger.info(f"Using Intel RealSense camera: {device_name}")
+                
             except ImportError:
                 logger.warning(
                     'Intel RealSense backend is not available; pyrealsense2 could not be imported')
@@ -80,18 +83,16 @@ class CameraSource:
                     logger.warning('No RealSense device was found')
                 else:
                     raise
-            # if realsense is not available
+                    
+            # If RealSense is not available, try using OpenCV camera
             if self._rs_pipeline is None:
                 cap = cv2.VideoCapture()
 
-                # the number here depends on your device's camera, usually default with 0
-                if cap.isOpened():
-
-                    cap.open(cv_device_index)
-
+                # Try to open standard camera
+                if cap.open(cv_device_index):
+                    logger.info("Using OpenCV camera")
                     cap.set(cv2.CAP_PROP_FOURCC,
                             cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
-                    # os.system('v4l2-ctl --device=/dev/video1 --set-ctrl=exposure_auto=2')
                     cap.set(cv2.CAP_PROP_EXPOSURE,
                             self.active_cam_config['exposure'][target_color])
                     cap.set(cv2.CAP_PROP_FRAME_WIDTH,
@@ -100,9 +101,15 @@ class CameraSource:
                             self.active_cam_config['capture_res'][1])
                     cap.set(cv2.CAP_PROP_FPS, self.active_cam_config['frame_rate'])
                     self._cv_color_cap = cap
-                # if built-in camera not available, open hik
+                # If built-in camera not available, try HikRobot as last resort
                 else:
-                    self.hik_frame_init = hik_init()
+                    try:
+                        logger.info("Trying to use HikRobot camera as fallback")
+                        self.hik_frame_init = hik_init()
+                        logger.info("Using HikRobot camera")
+                    except Exception as e:
+                        logger.error(f"Failed to initialize HikRobot camera: {e}")
+                        logger.error("No camera device found")
 
 
         else:
@@ -221,5 +228,5 @@ class CameraSource:
         if self.depth_frame_writer is not None:
             self.depth_frame_writer.release()
 
-        # if self.hik_frame_init is not None:
-        #     hik_close(self.hik_frame_init)
+        if self.hik_frame_init is not None:
+            hik_close(self.hik_frame_init)

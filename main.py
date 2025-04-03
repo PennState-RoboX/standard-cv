@@ -223,6 +223,10 @@ def get_3d_target_location(imgPoints, frame, depth_frame):
     # Convert the offset to angular measurements (yaw and pitch) in degrees
     angles = np.rad2deg(np.arctan2(center_offset, np.array(
         [active_cam_config['fx'], active_cam_config['fy']])))
+    
+    # Initialize Yaw and Pitch with default values from angles
+    Yaw = angles[0]
+    Pitch = angles[1]
 
     # Calculate depth based on the configured depth source
     if active_cam_config['depth_source'] == DepthSource.PNP:
@@ -248,8 +252,6 @@ def get_3d_target_location(imgPoints, frame, depth_frame):
         offsetP = -4 # offset for Pitch
         Pitch = -(np.arctan(tvec[(1, 0)] / tvec[(2, 0)]) / 2 / 3.1415926535897932 * 360) - offsetP
 
-
-
     elif active_cam_config['depth_source'] == DepthSource.STEREO:
         # Ensure the depth frame is available for stereo depth calculation
         assert depth_frame is not None
@@ -263,6 +265,9 @@ def get_3d_target_location(imgPoints, frame, depth_frame):
 
         # Calculate the mean depth value within the masked area
         meanDVal, _ = cv2.meanStdDev(depth_frame, mask=panel_mask_scaled)
+        
+        # Use the angles calculated earlier for Yaw and Pitch
+        # These are already set above, no need to set again
     else:
         # Throw an error if an invalid depth source is configured
         raise RuntimeError('Invalid depth source in camera config')
@@ -536,18 +541,15 @@ def float_to_hex(f):
     return ''.join([f'{byte:02x}' for byte in struct.pack('>f', f)])
 
 def decimalToHexSerial(Yaw, Pitch):
-    # ��Yaw��Pitchת��ΪIEEE 754��׼�����ֽڸ�������ʾ����ת��Ϊʮ�������ַ���
-    # turn Yaw and Pitch to IEEE 754 standard four-byte floating point representation and convert to hexadecimal string
+    # Yaw and Pitch to IEEE 754 standard four-byte floating point representation and convert to hexadecimal string
     hex_Yaw = float_to_hex(Yaw)
     hex_Pitch = float_to_hex(Pitch)
 
-    # ����У���
     # calculate checksum
     bytes_for_checksum = struct.pack('>ff', Yaw, Pitch) # only checked Yaw & Pitch data so far
     checksum = sum(bytes_for_checksum) % 256
     hex_checksum = f'{checksum:02x}'
 
-    # ����ʮ�����������б�
     # build hexadecimal data list
     return hex_Yaw, hex_Pitch, hex_checksum
      

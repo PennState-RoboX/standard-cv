@@ -9,8 +9,10 @@ This project is a computer vision application designed for real-time object dete
 
 ## **Requirement**
 
-**Camera Spec:**
-under construction
+**Camera Support:**
+- Intel RealSense D435i (preferred)
+- HikVision MV-CS016-10UC (backup)
+- Standard USB camera (fallback)
 
 **System**
 
@@ -18,8 +20,21 @@ under construction
 - Robot Master DevelopmentBoard C
 
 **Packages**
-- Install MVS SDK for Hikvision camera
-https://www.hikvision.com/us-en/support/download/sdk/
+- For Intel RealSense D435i: Install the librealsense SDK and Python wrapper
+  ```bash
+  # Install dependencies
+  sudo apt-get install -y libusb-1.0-0-dev libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev
+  
+  # Clone and build librealsense with Python bindings
+  git clone https://github.com/IntelRealSense/librealsense.git
+  cd librealsense
+  mkdir build && cd build
+  cmake .. -DBUILD_PYTHON_BINDINGS=TRUE -DPYTHON_EXECUTABLE=$(which python3)
+  make -j4
+  sudo make install
+  ```
+- For HikVision: Install MVS SDK for Hikvision camera
+  https://www.hikvision.com/us-en/support/download/sdk/
 - See **`requirements.txt`** for more detail
 
 ## **How to Run**
@@ -29,14 +44,14 @@ https://www.hikvision.com/us-en/support/download/sdk/
 Run the project in the default mode (video stream off):
 
 ```bash
-python3 ArmorDetect.py --target-color [red/blue] --show-stream NO
+python3 main.py --target-color [red/blue] --show-stream NO
 ```
 
 ### Testing with video stream
 Run the project with video stream on/off
 
 ```bash
-python3 ArmorDetect.py --target-color [red/blue] --show-stream YES/NO
+python3 main.py --target-color [red/blue] --show-stream YES/NO
 ```
 
 ### **Debug Mode**
@@ -45,7 +60,7 @@ Run the project with additional debug output
 You can adjust the color threshold to detect the Armor board in different light settings. 
 
 ```bash
-python3 ArmorDetect.py --debug --target-color [red/blue] --show-stream YES
+python3 main.py --debug --target-color [red/blue] --show-stream YES
 ```
 
 ### **Recording Mode**
@@ -53,7 +68,7 @@ python3 ArmorDetect.py --debug --target-color [red/blue] --show-stream YES
 The project supports recording video for testing:
 
 ```bash
-python3 ArmorDetect.py --target-color [red/blue] --recording-dest [Path for output video] --show-stream YES
+python3 main.py --target-color [red/blue] --recording-dest [Path for output video] --show-stream YES
 ```
 
 ### Test with Recording
@@ -61,9 +76,17 @@ python3 ArmorDetect.py --target-color [red/blue] --recording-dest [Path for outp
 You can load existing videos (.mp4) to test the project:
 
 ```
-python3 ArmorDetect.py --target-color [red/blue] --recording-source [Path for input video] --show-stream YES
+python3 main.py --target-color [red/blue] --recording-source [Path for input video] --show-stream YES
 ```
 
+## **Camera Selection**
+
+The system will automatically prioritize camera devices in the following order:
+1. Intel RealSense D435i - Provides both color and depth information
+2. Standard webcam - Provides only color information
+3. HikVision camera - Used as a fallback option
+
+To force the use of a specific camera, you can modify the `camera_source.py` file.
 
 ## **Structure**
 
@@ -85,7 +108,7 @@ MVS/                                                # Tools for hikvision camera
 ├── README.md
 ├── LICENSE
 ├── requirements.txt
-├── ArmorDetect.py                            # Armor detection, main file to run 
+├── main.py                                         # Main application file 
 ├── camera_params.py                                # Parameters and configurations of camera.
 ├── camera_source.py                                # Camera Class
 ├── hik_driver.py                                   # Driver script for Hikvision camera
