@@ -2,6 +2,8 @@ import json
 import logging
 from pathlib import Path
 from typing import Dict, Tuple, Optional
+import numpy as np
+import cv2
 from camera_params import camera_params, DepthSource
 from hik_driver import *
 
@@ -41,48 +43,88 @@ class CameraSource:
                 device = pipeline_profile.get_device()
                 device_name = str(device.get_info(rs.camera_info.name))
 
+                logger.info(f"Detected RealSense camera: {device_name}")
+                
                 if device_name in camera_params:
                     self.active_cam_config = camera_params[device_name]
+                    logger.info(f"Using configuration for {device_name}")
                 else:
-                    logger.warning(
-                        f'Unknown device name: "{device_name}". Falling back to default configuration.')
+                    # If device name not found, check for D435I specifically
+                    if "D435I" in device_name or "435i" in device_name:
+                        self.active_cam_config = camera_params['Intel RealSense D435I']
+                        logger.info(f"Using Intel RealSense D435I configuration")
+                    else:
+                        logger.warning(
+                            f'Unknown device name: "{device_name}". Falling back to default configuration.')
 
-                config.enable_stream(rs.stream.color, self.active_cam_config['capture_res'][0],
-                                     self.active_cam_config['capture_res'][1], rs.format.bgr8,
-                                     self.active_cam_config['frame_rate'])
+                # Reset configuration to ensure clean start
+                config = rs.config()
+                
+                # Configure color stream - use a more compatible resolution/format
+                config.enable_stream(
+                    rs.stream.color, 
+                    640, 480,  # Use standard resolution that's widely supported
+                    rs.format.bgr8, 
+                    30  # Use standard frame rate
+                )
 
                 if self.active_cam_config['depth_source'] == DepthSource.STEREO:
-                    config.enable_stream(rs.stream.depth, RS_DEPTH_CAPTURE_RES[0], RS_DEPTH_CAPTURE_RES[1],
-                                         rs.format.z16,
-                                         self.active_cam_config['frame_rate'])
+                    config.enable_stream(
+                        rs.stream.depth, 
+                        640, 480,  # Use standard resolution 
+                        rs.format.z16, 
+                        30  # Standard frame rate
+                    )
                     frame_aligner = rs.align(rs.stream.color)
                 else:
                     frame_aligner = None
 
                 # Start streaming
-                pipeline.start(config)
-
-                # Get the sensor once at the beginning. (Sensor index: 1)
-                sensor = pipeline.get_active_profile(
-                ).get_device().query_sensors()[1]
-
-                # Set the exposure anytime during the operation
-                sensor.set_option(
-                    rs.option.exposure, self.active_cam_config['exposure'][target_color])
-
-                self._rs_pipeline = pipeline
-                self._rs_frame_aligner = frame_aligner
-                
-                logger.info(f"Using Intel RealSense camera: {device_name}")
+                try:
+                    pipeline_profile = pipeline.start(config)
+                    logger.info("Successfully started RealSense pipeline")
+                    
+                    # Get the sensors
+                    depth_sensor = None
+                    color_sensor = None  # Define here to avoid "used before assignment" error
+                    
+                    for sensor in pipeline_profile.get_device().query_sensors():
+                        if sensor.get_info(rs.camera_info.name) == 'RGB Camera':
+                            color_sensor = sensor
+                        elif sensor.get_info(rs.camera_info.name) == 'Stereo Module':
+                            depth_sensor = sensor
+    
+                    # Set the exposure for the color sensor
+                    if depth_sensor is not None:
+                        # Enable auto exposure for depth sensor
+                        depth_sensor.set_option(rs.option.enable_auto_exposure, 1)
+                    
+                    # Set color sensor options
+                    if color_sensor is not None:
+                        try:
+                            color_sensor.set_option(
+                                rs.option.exposure, self.active_cam_config['exposure'][target_color])
+                            logger.info(f"Set exposure to {self.active_cam_config['exposure'][target_color]}")
+                        except Exception as e:
+                            logger.warning(f"Failed to set exposure: {e}")
+                    
+                    self._rs_pipeline = pipeline
+                    self._rs_frame_aligner = frame_aligner
+                    
+                    logger.info(f"Successfully initialized Intel RealSense camera: {device_name}")
+                except RuntimeError as ex:
+                    logger.error(f"Failed to start pipeline: {ex}")
+                    raise
                 
             except ImportError:
                 logger.warning(
                     'Intel RealSense backend is not available; pyrealsense2 could not be imported')
             except RuntimeError as ex:
+                logger.error(f"RealSense error: {ex}")
                 if len(ex.args) >= 1 and 'No device connected' in ex.args[0]:
                     logger.warning('No RealSense device was found')
                 else:
-                    raise
+                    logger.error(f"Failed to initialize RealSense camera: {ex}")
                     
             # If RealSense is not available, try using OpenCV camera
             if self._rs_pipeline is None:
@@ -110,7 +152,6 @@ class CameraSource:
                     except Exception as e:
                         logger.error(f"Failed to initialize HikRobot camera: {e}")
                         logger.error("No camera device found")
-
 
         else:
             cam_config_path = recording_source.with_name(

@@ -879,9 +879,21 @@ if __name__ == "__main__":
     args.target_color = TargetColor(args.target_color)
     num = 0  # for collecting dataset, pictures' names
 
-    # choose camera params
-    camera = CameraSource(camera_params['HIK MV-CS016-10UC General'], args.target_color.value,
-                          recording_source=args.recording_source, recording_dest=args.recording_dest)
-    
-    active_cam_config = camera.active_cam_config
-    main(camera, args.target_color, args.show_stream)
+    # choose camera params - use Intel RealSense D435I config based on detected hardware
+    try:
+        camera = CameraSource(camera_params['Intel RealSense D435I'], args.target_color.value,
+                            recording_source=args.recording_source, recording_dest=args.recording_dest)
+        
+        active_cam_config = camera.active_cam_config
+        main(camera, args.target_color, args.show_stream)
+    except Exception as e:
+        print(f"Failed to initialize camera: {e}")
+        print("Trying fallback to generic camera...")
+        try:
+            camera = CameraSource(camera_params['Generic Webcam'], args.target_color.value,
+                                recording_source=args.recording_source, recording_dest=args.recording_dest)
+            active_cam_config = camera.active_cam_config
+            main(camera, args.target_color, args.show_stream)
+        except Exception as e:
+            print(f"Failed to initialize generic camera: {e}")
+            print("No camera device found. Please check your camera connection.")
