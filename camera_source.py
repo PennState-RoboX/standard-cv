@@ -65,7 +65,7 @@ class CameraSource:
                     rs.stream.color, 
                     640, 480,  # Use standard resolution that's widely supported
                     rs.format.bgr8, 
-                    30  # Use standard frame rate
+                    self.active_cam_config['frame_rate']  # Use frame rate from config
                 )
 
                 if self.active_cam_config['depth_source'] == DepthSource.STEREO:
@@ -73,7 +73,7 @@ class CameraSource:
                         rs.stream.depth, 
                         640, 480,  # Use standard resolution 
                         rs.format.z16, 
-                        30  # Standard frame rate
+                        self.active_cam_config['frame_rate']  # Use frame rate from config
                     )
                     frame_aligner = rs.align(rs.stream.color)
                 else:
@@ -82,7 +82,7 @@ class CameraSource:
                 # Start streaming
                 try:
                     pipeline_profile = pipeline.start(config)
-                    logger.info("Successfully started RealSense pipeline")
+                    logger.info(f"Successfully started RealSense pipeline with {self.active_cam_config['frame_rate']} FPS")
                     
                     # Get the sensors
                     depth_sensor = None
