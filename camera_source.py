@@ -5,9 +5,16 @@ from typing import Dict, Tuple, Optional
 import numpy as np
 import cv2
 from camera_params import camera_params, DepthSource
-from hik_driver import *
 
 logger = logging.getLogger(__name__)
+
+# Try importing HIK driver but handle failures gracefully
+try:
+    from hik_driver import *
+    HIKVISION_AVAILABLE = True
+except Exception as e:
+    logger.error(f"Failed to import HIK driver: {e}")
+    HIKVISION_AVAILABLE = False
 
 RS_DEPTH_CAPTURE_RES = (640, 480)
 
@@ -128,34 +135,76 @@ class CameraSource:
                     
             # If RealSense is not available, try using OpenCV camera
             if self._rs_pipeline is None:
-                cap = cv2.VideoCapture()
+                # Try the camera indices we know work first (based on our test)
+                # working_indices = [2, 4, cv_device_index, 0, 1, 3, 5]
+                working_indices = [3,4,5,6,7,8,9,10,11,12,13]
+                cap = None
+                
+                for idx in working_indices:
+                    # Don't try the same index twice
+                    if idx in working_indices[:working_indices.index(idx)]:
+                        continue
+                        
+                    logger.info(f"Trying OpenCV camera at index {idx}")
+                    temp_cap = cv2.VideoCapture(idx)
+                    print(idx)
+                    # input('....')
+                    if temp_cap.isOpened():
+                        logger.info(f"Successfully opened camera at index {idx}")
+                        cap = temp_cap
+                        break
+                    else:
+                        temp_cap.release()
+                        logger.warning(f"Failed to open camera at index {idx}")
 
-                # Try to open standard camera
-                if cap.open(cv_device_index):
+                # If we found a working camera
+                if cap is not None:
                     logger.info("Using OpenCV camera")
-                    cap.set(cv2.CAP_PROP_FOURCC,
-                            cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
-                    cap.set(cv2.CAP_PROP_EXPOSURE,
-                            self.active_cam_config['exposure'][target_color])
-                    cap.set(cv2.CAP_PROP_FRAME_WIDTH,
-                            self.active_cam_config['capture_res'][0])
-                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT,
-                            self.active_cam_config['capture_res'][1])
-                    cap.set(cv2.CAP_PROP_FPS, self.active_cam_config['frame_rate'])
+                    try:
+                        # Set optimal camera properties for high FPS
+                        # Use MJPG format for higher FPS
+                        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
+                        
+                        # Set smaller resolution for higher FPS
+                        cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.active_cam_config['capture_res'][0])
+                        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.active_cam_config['capture_res'][1])
+                        
+                        # Try to set exposure
+                        cap.set(cv2.CAP_PROP_EXPOSURE, self.active_cam_config['exposure'][target_color])
+                        
+                        # Set target frame rate
+                        cap.set(cv2.CAP_PROP_FPS, self.active_cam_config['frame_rate'])
+                        
+                        # Set buffer size to 1 to get latest frame (reduce latency)
+                        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                        
+                        # Get actual camera properties for debugging
+                        actual_width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+                        actual_height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+                        actual_fps = cap.get(cv2.CAP_PROP_FPS)
+                        logger.info(f"Camera initialized with: {actual_width}x{actual_height} @ {actual_fps}fps")
+                        
+                    except Exception as e:
+                        logger.warning(f"Failed to set some camera properties: {e}")
+                    
                     self._cv_color_cap = cap
                 # If built-in camera not available, try HikRobot as last resort
                 else:
-                    try:
-                        logger.info("Trying to use HikRobot camera as fallback")
-                        self.hik_frame_init = hik_init()
-                        logger.info("Using HikRobot camera")
-                    except Exception as e:
-                        logger.error(f"Failed to initialize HikRobot camera: {e}")
-                        logger.error("No camera device found")
+                    if HIKVISION_AVAILABLE:
+                        try:
+                            logger.info("Trying to use HikRobot camera as fallback")
+                            self.hik_frame_init = hik_init()
+                            logger.info("Using HikRobot camera")
+                        except Exception as e:
+                            logger.error(f"Failed to initialize HikRobot camera: {e}")
+                            logger.error("No camera device found")
+                    else:
+                        logger.error("HikRobot camera support not available - no camera device found")
 
         else:
             cam_config_path = recording_source.with_name(
                 recording_source.name + '.config.json')
+
             with open(cam_config_path, 'r', encoding='utf8') as cam_config_file:
                 self.active_cam_config = json.load(cam_config_file)
 

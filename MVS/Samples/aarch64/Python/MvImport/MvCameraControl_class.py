@@ -13,8 +13,48 @@ from MVS.Samples.aarch64.Python.MvImport.MvErrorDefine_const import *
 from MVS.Samples.aarch64.Python.MvImport.PixelType_const import *
 from MVS.Samples.aarch64.Python.MvImport.PixelType_header import *
 
-MvCamCtrldll = ctypes.cdll.LoadLibrary(
-    os.getenv('MVCAM_COMMON_RUNENV') + "/64/libMvCameraControl.so")
+# Try to load the library from various possible locations
+def load_mvcam_library():
+    possible_paths = [
+        # First try using the environment variable if it exists
+        os.getenv('MVCAM_COMMON_RUNENV') + "/64/libMvCameraControl.so" if os.getenv('MVCAM_COMMON_RUNENV') else None,
+        # Standard installation path
+        "/opt/MVS/lib/64/libMvCameraControl.so",
+        # Alternative installation paths
+        "/opt/MVS/lib/aarch64/libMvCameraControl.so",
+        "/usr/lib/libMvCameraControl.so",
+        "/usr/local/lib/libMvCameraControl.so",
+        # Try current directory
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "libMvCameraControl.so")
+    ]
+    
+    # Filter out None values
+    possible_paths = [p for p in possible_paths if p]
+    
+    for path in possible_paths:
+        try:
+            return ctypes.cdll.LoadLibrary(path)
+        except OSError:
+            continue
+    
+    # If we get here, we couldn't find the library
+    available_paths = "\n".join(possible_paths)
+    raise OSError(f"Could not find libMvCameraControl.so. Tried the following paths:\n{available_paths}\n"
+                 f"Please install the MVS SDK or set the MVCAM_COMMON_RUNENV environment variable.")
+
+# Load the library
+try:
+    MvCamCtrldll = load_mvcam_library()
+except OSError as e:
+    print(f"WARNING: {e}")
+    print("Continuing with a mock library - camera functionality will not work properly")
+    # Create a mock class that will allow importing but fail at runtime
+    class MockLibrary:
+        def __getattr__(self, name):
+            def mock_func(*args, **kwargs):
+                raise RuntimeError("MVS camera library not available - functionality disabled")
+            return mock_func
+    MvCamCtrldll = MockLibrary()
 
 # 用于回调函数传入相机实例
 

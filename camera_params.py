@@ -9,18 +9,50 @@ class DepthSource(enum.IntEnum):
 
 camera_params = {
     'Generic Webcam': {
-        'frame_rate': 30,
+        'frame_rate': 60,
         'exposure': {'red': 45.0, 'blue': 20.0},
-        'capture_res': (1280, 720),
+        'capture_res': (640, 480),
         'depth_source': DepthSource.PNP,
-        'fov': (90,65)
+        'fov': (90,65),
+        'camera_offset': [0, 0, 0],
+        'camera_matrix': [
+            [600, 0, 320],
+            [0, 600, 240],
+            [0, 0, 1]
+        ],
+        'distort_coeffs': [0.0, 0.0, 0.0, 0.0, 0.0],
+        'cx': 320,
+        'cy': 240,
+        'fx': 600,
+        'fy': 600,
+        'k1': 0.0,
+        'k2': 0.0,
+        'p1': 0.0,
+        'p2': 0.0,
+        'k3': 0.0
     },
     'Intel RealSense D435I': {
         'frame_rate': 60,
         'exposure': {'red': 15.0, 'blue': 35.0},
         'fov': (69, 42),
-        'capture_res': (960, 540),
-        'depth_source': DepthSource.STEREO
+        'capture_res': (640, 480),
+        'depth_source': DepthSource.STEREO,
+        'camera_offset': [0, 0, 0],
+        'camera_matrix': [
+            [600, 0, 320],
+            [0, 600, 240],
+            [0, 0, 1]
+        ],
+        'distort_coeffs': [0.0, 0.0, 0.0, 0.0, 0.0],
+        'cx': 320,
+        'cy': 240,
+        'fx': 380,
+        'fy': 380,
+        'k1': 0.0,
+        'k2': 0.0,
+        'p1': 0.0,
+        'p2': 0.0,
+        'k3': 0.0
     },
     'Intel RealSense D455': {
         'frame_rate': 60,
